@@ -1,0 +1,104 @@
+************************************************************
+*
+*                  proc sql - collapsing across obs        *
+*
+************************************************************;
+
+data kids;
+  length kidname $ 4 sex $ 1;
+  input famid kidname birth age wt sex ;
+cards;
+1 Beth 1  9  60  f
+1 Bob  2  6  40  m
+1 Barb 3  3  20  f
+2 Andy 1  8  80  m
+2 Al   2  6  50  m
+2 Ann  3  2  20  f
+3 Pete 1  6  60  m
+3 Pam  2  4  40  f
+3 Phil 3  2  20  m
+;
+run;
+
+** 1. grand mean of age: mean(age);
+proc sql; 
+  create table kids1 as
+  select *,  mean(age) as mean_age 
+  from kids;
+quit;
+
+proc print data=kids1 noobs;
+run;
+
+
+** 2. group mean;
+* famid as a G var: group by famid
+* G mean of age;
+proc sql; 
+  create table kids2 as
+  select *, mean(age)  label="group average" as mean_age 
+  from kids
+  group by famid;
+quit;
+
+title 'New Variable of Group Mean';
+proc print data=kids2 noobs;
+run;
+
+title 'Label at Work';
+proc freq data=kids2;
+  table mean_age;
+run;
+
+
+** 3. Create multiple vars of summary stats at once;
+proc sql;
+  create table kids3 as
+  select famid, mean(age) as mean_age , std(age) as std_age, 
+         mean(wt) as mean_wt, std(wt) as std_wt from kids
+  group by famid;
+quit;
+
+proc print data=kids3 noobs;
+run;
+
+
+** 4. Create multiple vars of summary stats in original data;
+proc sql;
+  create table fam5 as
+  select *, mean(age) as mean_age, std(age) as std_age, 
+         mean(wt) as mean_wt, std(wt) as std_wt from kids
+  group by famid
+  order by famid, kidname desc;
+quit;
+
+proc print data=fam5;
+run;
+
+
+** 5. Create multiple vars of summary stats on the fly;
+proc sql;
+  create table my_count as
+  select famid, sum(boy) as num_boy, sum(girl) as num_girl from
+  (select famid, (sex='m') as boy, (sex='f') as girl from kids)
+  group by famid;
+quit;
+
+proc print data=my_count noobs;
+run;
+
+
+** 6. Create grand mean and save it into a SAS macro variable;
+* save the grand mean of variable age into macro variable meanage;
+proc sql noprint; 
+   select mean(age) into :meanage from kids;
+quit;
+%put &meanage;
+
+
+** 7. Creating group means and save them into a sequence of SAS macro variables;
+proc sql noprint;  
+   select mean(age) into :meanage1 - :meanage3 from kids
+   group by famid;
+quit;
+%put _user_; 
