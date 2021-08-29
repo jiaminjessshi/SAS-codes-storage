@@ -1,0 +1,211 @@
+**** 1. 1-1;
+data dads; 
+  input famid name $ inc ; 
+cards; 
+2 Art  22000 
+1 Bill 30000 
+3 Paul 25000 
+; 
+run; 
+
+data faminc; 
+  input famid faminc96 faminc97 faminc98 ; 
+cards; 
+3 75000 76000 77000 
+1 40000 40500 41000 
+2 45000 45400 45800 
+;
+run;
+
+** unique ID=famid;
+proc sql;
+  create table dadfam1 as
+  select * 
+  from dads, faminc
+  where dads.famid=faminc.famid
+  order by dads.famid;
+quit;
+
+proc print data=dadfam1;
+run;
+
+
+**** 2. 1-many;
+data dads; 
+  input fid name $ inc ; 
+cards; 
+2 Art  22000 
+1 Bill   30000 
+3 Paul  25000 
+; 
+run; 
+
+* Next we make the "kids" data file ;
+data kids; 
+  input famid kidname $ birth age wt sex $ ; 
+cards; 
+1 Beth 1 9 60 f 
+1 Bob  2 6 40 m 
+1 Barb 3 3 20 f 
+2 Andy 1 8 80 m 
+2 Al   2 6 50 m 
+2 Ann  3 2 20 f 
+3 Pete 1 6 60 m 
+3 Pam  2 4 40 f 
+3 Phil 3 2 20 m 
+; 
+run;
+
+** unique ID=fid in dads, famid in kids;
+proc sql; 
+  create table dadkid2 as
+  select  * 
+  from dads, kids
+  where dads.fid=kids.famid
+  order by dads.fid, kids.kidname;
+quit;
+
+proc print data=dadkid2;
+run;
+
+
+**** 3. rename vars with the same name in merging;
+data dads;
+ input famid name $ inc98;
+cards;
+2 Art  22000
+1 Bill 30000
+3 Paul 25000
+;
+run;
+
+data faminc;
+ input famid inc96 inc97 inc98;
+cards;
+3 75000 76000 77000
+1 40000 40500 41000
+2 45000 45400 45800
+;
+run;
+
+proc sql; 
+  create table dadkid4 as
+  select * 
+  from dads, faminc
+  where dads.famid=faminc.famid
+  order by dads.famid;
+quit;
+
+proc print data=dadkid4;
+run;
+
+** rename;
+* inc98 in dads data -> dadinc98;
+* inc98 in faminc data -> faminc98; 
+proc sql; 
+  create table dadkid5 as
+  select *, dads.inc98 as dadinc98, faminc.inc98 as faminc98  
+  from dads, faminc
+  where dads.famid=faminc.famid
+  order by dads.famid;
+quit;
+
+proc print data=dadkid5;
+run;
+
+
+**** 4. full join to handle mismatching records in 1-1 merge;
+data dads;
+ input famid name $ inc;
+cards;
+2 Art  22000
+1 Bill 30000
+3 Paul 25000
+4 Karl 95000
+;
+run;
+
+data faminc;
+ input famid faminc96 faminc97 faminc98;
+cards;
+3 75000 76000 77000
+1 40000 40500 41000
+2 45000 45400 45800
+5 55000 65000 70000
+6 22000 24000 28000
+;
+run;
+
+** unmatched records have been dropped out in the merged data set, \
+since the where statement eliminated them;
+proc sql; 
+  create table dadkid3 as
+  select  *
+  from dads, faminc
+  where dads.famid=faminc.famid
+  order by dads.famid;
+quit;
+
+proc print data=dadkid3;
+run;
+
+** create 2 new variables;
+* indic: an indicator variable that indicates whether an observation is from both datasets, 
+1 being from both datasets and 0 otherwise
+* fid: a coalesce of famid from both datasets;
+proc sql; 
+  create table dadkid4  as
+  select  *, (dads.famid=faminc.famid) as indic, 
+             (dads.famid ~=.) as dadind,
+             (faminc.famid ~=.) as famind,
+             coalesce(dads.famid, faminc.famid) as fid
+  from dads full join faminc on dads.famid=faminc.famid;
+quit;
+
+proc print data=dadkid4;
+run;
+
+
+**** 5. Produce all the possible distinct pairs of the values in a coln;
+data places;
+input pid city $12.;
+cards; 
+ 1   LosAngeles
+ 2   Orlando
+ 3   London
+ 4   NewYork
+ 5   Boston
+ 6   Paris
+ 7   Washington
+ 8   LosAngeles
+ 9   Orlando
+ 10  London
+;
+run;
+
+* select all unique values in city;
+proc sql;
+  create table discity  as 
+  select distinct city 
+  from places; 
+quit;
+
+proc print data=discity;
+  title "Distinct Cities";
+  format city $12.;
+run;
+
+* there are seven different places -> 7*6/2 =21 pairs of cities;
+proc sql;
+   create table pair_places as
+   select f1.city as orig ,
+          f2.city as dest
+    from  discity  as f1 , discity as f2
+   where f1.city ne ' ' & f1.city < f2.city
+   order by f1.city, f2.city; 
+quit;
+
+title 'All Possible Paired Places';
+proc print data=pair_places;
+  format orig dest $12.;
+run;
