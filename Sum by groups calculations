@@ -1,0 +1,63 @@
+ods PDF file="location\file.pdf"; 
+
+*** proc sql - sum, group by;
+** group firmID, year, create new variable: nb_Indicator_0= sum(indicator=0);
+data have;
+	input FirmID        Year        indicator;
+	cards;
+	10001        1995          1
+	10001        1996          0
+	10001        1997          0
+	10001        1997          1
+	10001        1998          1
+	10001        1999          0
+	10001        1999          0
+	10001        1999          1
+	10001        2000          0
+	10001        2001          1
+	;
+
+proc sql;
+	create table want as
+	select firmid, year, sum(indicator=0) as nb_Indicator_0
+	from have
+	group by firmid, year;
+	quit;
+
+** show table outputs;
+proc print data=have;
+run;
+
+proc print data=want;
+run;
+
+
+*** proc sort, by - calculate accumulative sum;
+** sum of profit by region & product;
+proc sort data=sashelp.shoes out=sort_shoes; 
+	by Region Product; 
+	run; 
+
+data profitsummary; 
+	set sort_shoes; 
+	by Region Product; 
+	
+	Profit=Sales-Returns; 
+	
+	if First.Product then Total=0; 
+	TotalProfit+Profit; 
+	if Last.Product=1; 
+	
+	keep Region Product TotalProfit; 
+	format TotalProfit dollar12.; 
+	run;
+
+** show table outputs;
+proc print data=sashelp.shoes;
+run;
+
+proc print data=sort_shoes;
+run;
+
+quit; 
+ods PDF close;
