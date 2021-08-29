@@ -1,0 +1,110 @@
+libname sv 'folder to load data';
+
+data whas500;
+	set sv.whas500;
+	run;
+
+proc format library=work;
+value gender
+	  0 = "Male"
+	  1 = "Female";
+run;
+
+data whas500;
+	set whas500;
+	format gender gender.;
+	run;
+
+*** cumulative distribution function';
+proc univariate data = whas500(where=(fstat=1));
+	var lenfol;
+	cdfplot lenfol;
+	run;
+
+*** survival function;
+** y=fstat, x=lenfol;
+proc lifetest data=whas500(where=(fstat=1)) plots=survival(atrisk);
+	time lenfol*fstat(0);
+	run; 
+
+*** hazard function;
+proc lifetest data=whas500(where=(fstat=1)) plots=hazard(bw=200);
+	time lenfol*fstat(0);
+	run;
+
+*** cumulative hazard function;
+ods output ProductLimitEstimates = ple;
+	proc lifetest data=whas500(where=(fstat=1))  nelson outs=outwhas500;
+	time lenfol*fstat(0);
+	run;
+
+proc sgplot data = ple;
+	series x = lenfol y = CumHaz;
+	run;
+
+*** non-parametric;
+** Kaplan-Meier estimator of the survival function;
+proc lifetest data=whas500 atrisk outs=outwhas500;
+	time lenfol*fstat(0);
+	run;
+
+* cb: add confidence intervals;
+proc lifetest data=whas500 atrisk plots=survival(cb) outs=outwhas500;
+	time lenfol*fstat(0);
+	run;
+
+** Nelson-Aalen estimator of the cumulative hazard function;
+proc lifetest data=whas500 atrisk nelson;
+	time lenfol*fstat(0);
+	run;
+
+proc lifetest data=whas500 atrisk plots=survival(atrisk cb) outs=outwhas500;
+strata gender;  /* compare the survival experiences of males and females */
+time lenfol*fstat(0);  
+run;
+
+** hazard function;
+* plot=hazard(bw=200): plots of the hazard function with a bandwidth of 200 days;
+proc lifetest data=whas500 atrisk plots=hazard(bw=200) outs=outwhas500;
+	strata bmi(15,18.5,25,30,40);
+	time lenfol*fstat(0);
+run;
+
+*** Cox proportional hazards regression;
+proc phreg data = whas500;
+	class gender;
+	model lenfol*fstat(0) = gender age;;
+	run;
+
+proc phreg data=whas500 plots=survival;
+	class gender;
+	model lenfol*fstat(0) = gender age;;
+	run;
+	
+proc format;
+	value gender 0 = "male" 1 = "female";
+	run;
+	
+data covs;
+format gender gender.;
+input gender age;
+datalines;
+0 69.845947
+1 69.845947
+;
+run;
+
+* rowid=gender: label curves using variable gender;
+proc phreg data = whas500 plots(overlay)=(survival);
+	class gender;
+	model lenfol*fstat(0) = gender age;
+	baseline covariates=covs out=base / rowid=gender;
+	run;
+;
+
+** model with interaction terms;
+proc phreg data = whas500;
+	format gender gender.;
+	class gender;
+	model lenfol*fstat(0) = gender|age bmi|bmi hr ;
+	run;
