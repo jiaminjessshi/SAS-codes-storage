@@ -1,0 +1,176 @@
+**** poisson;
+libname temp 'folder to load dataset';
+
+data poisson_sim;
+	set temp.poisson_sim;
+	run;
+
+proc freq data=poisson_sim;
+tables num_awards / plots=freqplot;
+run;
+
+*** poisson;
+** param = glm to save the model using the store statement for future post estimations;
+** type3: get multi-degree-of-freedom test of the categorical variables listed on the class statement;
+proc genmod data = poisson_sim;
+  class prog  /param=glm;
+  model num_awards = prog math / type3 dist=poisson;
+  store p1;  /* store model results as p1 */
+run;
+
+** chi-square test to assess model fit;
+data pvalue;
+  df = 196; chisq = 189.4495;
+  pvalue = 1 - probchi(chisq, df);
+run;
+
+proc print data = pvalue noobs;
+run;
+* Assume significance threshold=0.05, as p-value > 0.05, model fits the data;
+
+
+*** poisson with robust standard errors;
+proc genmod data = poisson_sim;
+  class prog id /param=glm;
+  model num_awards = prog math /dist=poisson;
+  repeated subject=id; 
+run;
+
+*** show incident rate ratios (IRR);
+ods output ParameterEstimates = est;
+proc plm source = p1;
+  show parameters;
+run;
+
+data est_exp;
+  set est;
+  irr = exp(estimate);
+  if parameter ^="Intercept";
+run;
+
+proc print data = est_exp;
+run;
+
+*** obtain predicted means (predicted count);
+proc plm source = p1;
+  lsmeans prog /ilink cl;
+run;
+
+*** obtain averaged predicted counts for values of math that range from 35 to 75 in increments of 10;
+data toscore;
+  set poisson_sim;
+  do math_cat = 35 to 75 by 10;
+     math = math_cat;
+     output;
+  end;
+run;
+
+proc plm source=p1;
+  score data = toscore out=math /ilink;
+run;
+
+proc means data = math mean;
+  class math_cat;
+  var predicted;
+run;
+
+*** graph predicted number of events;
+ods graphics on;
+ods html style=journal;
+
+proc plm source=p1;
+  score data = poisson_sim out=pred /ilink;
+run;
+
+proc sort data = pred;
+  by prog math;
+run;
+
+proc sgplot data = pred;
+  series x = math y = predicted /group=prog;
+run;
+
+ods graphics off;
+
+
+*** negative binomial;
+data nb_data;
+	set temp.nb_data;
+	run;
+	
+proc univariate data = nb_data noprint;
+  histogram daysabs / midpoints = 0 to 50 by 1 vscale = count ;
+run;
+
+** ref=first changes the reference group to 1st level of prog;
+proc genmod data = nb_data;
+  class prog (param=ref ref=first);
+  model daysabs = math prog / type3 dist=negbin;
+run;
+
+** use value & value/df from Pearson Chi-Square test above to calculate p-value;
+data test; 
+  pval = 1 - probchi(339.8771, 310);
+run;
+
+proc print data = test; run;
+* Assume significance threshold=0.05, as p-value > 0.05, model fits the data;
+
+*** exp: otain IRR;
+proc genmod data = nb_data;
+  class prog (param=ref ref=first);
+  model daysabs = math prog / type3 dist=negbin;
+  estimate 'prog 2' prog 1 0 / exp;
+  estimate 'prog 3' prog 0 1 / exp;
+  estimate 'math'   math 1   / exp;
+run; 
+
+*** estimate: calculate predicted number of events at each level of prog, holding all other variables (in this example, math) in the model at their means;
+proc genmod data = nb_data;
+  class prog (param=ref ref=first);
+  model daysabs = math prog / type3 dist=negbin;
+  estimate 'prog 1' intercept 1 prog 0 0 math 48.2675 / exp;
+  estimate 'prog 2' intercept 1 prog 1 0 math 48.2675 / exp;
+  estimate 'prog 3' intercept 1 prog 0 1 math 48.2675 / exp;
+run;
+
+*** estimate: predicted number of events for values of math while holding prog constant;
+proc genmod data = nb_data;
+  class prog (param=ref ref=first);
+  model daysabs = math prog / type3 dist=negbin;
+  estimate 'math 20' intercept 1 prog 0 0 math 20 / exp;
+  estimate 'math 40' intercept 1 prog 0 0 math 40 / exp;
+run;
+
+*** Graph predicted number of events;
+proc genmod data = nb_data;
+  class prog (param=ref ref=first);
+  model daysabs = math prog / type3 dist=negbin;
+  output out = nb_pred predicted = pred1;
+run;
+
+proc sort data = nb_pred;
+  by pred1;
+run;
+
+proc sgplot data = nb_pred;
+  series x=math y=pred1 / group = prog;
+run; 
+
+
+*** zero-inflated;
+data fish;
+	set temp.fish;
+	run;
+
+proc genmod data = fish;
+  class camper;
+  model count = child camper /dist=zip;
+  zeromodel persons /link = logit;
+run;
+
+*** null model;
+proc genmod data = fish;
+  model count =  /dist=zip;
+  zeromodel  / link = logit ;
+run;
