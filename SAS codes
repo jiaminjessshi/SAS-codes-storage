@@ -1,0 +1,205 @@
+DATA times ;
+  INPUT id trial1 trial2 trial3 ;
+CARDS ;
+1 1.5 1.4 1.6 
+2 1.5  .  1.9 
+3  .  2.0 1.6 
+4  .   .  2.2 
+5 2.1 2.3 2.2
+6 1.8 2.0 1.9
+;
+RUN ;
+ 
+PROC PRINT DATA=times ;
+RUN ;  
+
+
+PROC MEANS DATA=times ;
+  VAR trial1 trial2 trial3 ;
+RUN ;
+
+PROC FREQ DATA=times ;
+  TABLES trial1 trial2 trial3 ;
+RUN ;
+
+*** Pairwise deletion of NA;
+* For each pair of variables, proc corr used the number of pairs that had valid data. 
+* For the pair formed by trial1 and trial2,  there were 3 pairs with valid data.  
+* For the pairing of trial1 and trial3 there were 4 valid pairs, and likewise there were 
+4 valid pairs for trial2 and trial3.  Since this used all of the valid pairs of data, 
+this is often called pairwise deletion of missing data.;
+PROC CORR DATA=times ;
+  VAR trial1 trial2 trial3 ;
+RUN ;  
+
+*** Listwise deletion: nomiss;
+* When any of the variables are missing, the entire observation is omitted from the analysis;
+PROC CORR DATA=times NOMISS ;
+  VAR trial1 trial2 trial3 ;
+RUN ;  
+
+
+**** computations involving missing values yield missing values;
+DATA times2 ;
+  SET times ;
+  avg = (trial1 + trial2 + trial3) / 3 ;
+RUN ;
+ 
+PROC PRINT DATA=times2 ;
+RUN ;
+
+*** Ave for non-NA data: mean;
+DATA times3 ;
+  SET times ;
+  avg = MEAN(trial1, trial2, trial3) ;
+RUN ;
+ 
+PROC PRINT DATA=times3 ;
+RUN ; 
+
+*short cut: avg = mean(of trial1-trial50);
+
+
+*** Sum non-NA values -> times: N;
+DATA times4 ;
+  SET times ;
+  n = N(trial1, trial2, trial3) ;
+RUN ;
+ 
+PROC PRINT DATA=times4 ;
+RUN ;  
+
+
+*** ave+n;
+* create avg only when there are two or more valid values, but if the number of 
+non-missing values is 1 or less, then make avg to be missing;
+DATA times5 ;
+  SET times ;
+  n = N(trial1, trial2, trial3) ;
+  IF n >= 2 THEN avg = MEAN(trial1, trial2, trial3) ;
+  IF n <= 1 THEN avg=. ; 
+RUN ; 
+
+PROC PRINT DATA=times5 ; 
+RUN ;
+
+
+*** trial1a is only 0 when it is less than or equal to 1.5 and it is not missing;
+DATA times2 ;
+  SET times ;
+  trial1a = .;
+  if (trial1 <= 1.5) and (trial1 > .) then trial1a = 0;
+  if (trial1 > 1.5) then trial1a = 1 ;
+RUN ;
+
+proc print data=times2;
+  var id trial1 trial1a;
+run;
+
+
+**** distingush diff types of NA's;
+data test1;
+  input score female ses ;
+datalines;
+56    1    1 
+62    1    2 
+73    0    3
+67 -999    1
+57    0    1
+56  -99    2
+57    1 -999
+;
+run;
+
+
+*using the array;
+data test1b;
+ set test1;
+  array miss(2) female ses;
+   do i = 1 to 2;
+   if miss(i) = -999 then miss(i) =.a;
+   if miss(i) = -99 then miss(i) =.b;  
+  end;
+drop i;
+run;
+
+proc print data = test1b;
+run; 
+
+
+
+**** single;
+*** categorical: .a -> 0 (ref level);
+data test1c;
+	set test1b;
+	if female=.a then female=0;
+	run;
+
+*** numeric: . -> mean;
+/* Create "original data" by randomly inserting missing values for some heights */
+data Have;
+set sashelp.class;
+call streaminit(12345);
+Replaced = rand("Bernoulli", 0.4);  /* indicator variable is 1 about 40% of time */
+if Replaced then Height = .;        
+run;
+ 
+/* Mean imputation: Use PROC STDIZE to replace missing values with mean */
+proc stdize data=Have out=Imputed 
+      oprefix=Orig_         /* prefix for original variables */
+      reponly               /* only replace; do not standardize */
+      method=MEAN;          /* or MEDIAN, MINIMUM, MIDRANGE, etc. */
+   var Height;              /* you can list multiple variables to impute */
+run;
+ 
+proc print data=Imputed;
+   format Orig_Height Height BESTD8.1;
+   var Name Orig_Height Height Weight Replaced;
+run;
+
+*** numeric: . -> median;
+proc stdize data=Have out=Imputed 
+      oprefix=Orig_         /* prefix for original variables */
+      reponly               /* only replace; do not standardize */
+      method=median;          /* or MEDIAN, MINIMUM, MIDRANGE, etc. */
+   var Height;              /* you can list multiple variables to impute */
+run;
+ 
+proc print data=Imputed;
+   format Orig_Height Height BESTD8.1;
+   var Name Orig_Height Height Weight Replaced;
+run;
+
+
+data Fish1;
+	input Length1 Length2 Length3 @@;
+	datalines;
+	23.2  25.4  30.0     24.0  26.3  31.2
+	23.9  26.5  31.1     26.3  29.0  33.5
+	26.5  29.0    .      26.8  29.7  34.7
+	26.8    .     .      27.6  30.0  35.0
+	27.6  30.0  35.1     28.5  30.7  36.2
+	28.4  31.0  36.2     28.7    .     .
+	29.1  31.5    .      29.5  32.0  37.3
+	29.4  32.0  37.2     29.4  32.0  37.2
+	30.4  33.0  38.3     30.4  33.0  38.5
+	30.9  33.5  38.6     31.0  33.5  38.7
+	31.3  34.0  39.5     31.4  34.0  39.2
+	31.5  34.5    .      31.8  35.0  40.6
+	31.9  35.0  40.5     31.8  35.0  40.9
+	32.0  35.0  40.6     32.7  36.0  41.5
+	32.8  36.0  41.6     33.5  37.0  42.6
+	35.0  38.5  44.1     35.0  38.5  44.0
+	36.2  39.5  45.3     37.4  41.0  45.9
+	38.0  41.0  46.5
+	;
+
+*** regression method;
+* regression method for variable Length2: reg()
+* predictive  mean  matching  method for  variable Length3: regpmm();
+proc mi data=Fish1 seed=899603 out=miout1;
+	var Length1 Length2 Length3;
+	monotone
+		reg(Length2)
+		regpmm(Length3= Length1 Length2 Length1*Length2);
+		run;
