@@ -1,0 +1,27 @@
+*** output;
+libname ats 'folder to load data';
+
+data hsb2;
+	set ats.hsb2;
+	run;
+
+** note. graphs are not outputed;
+ODS TAGSETS.EXCELXP
+file='folder to output data in excel\analysis outputs.xls'
+STYLE=minimal
+OPTIONS ( Orientation = 'landscape'
+FitToPage = 'yes'
+Pages_FitWidth = '1'
+Pages_FitHeight = '100' );
+
+proc reg data = hsb2;
+  model write = female math read;
+run;
+quit;
+
+proc format;
+  value fm 1='Female' 0='Male' ;
+  value ses 1='Low' 2='Middle' 3='High';
+run;
+
+ods tagsets.excelxp close;
