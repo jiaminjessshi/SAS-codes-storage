@@ -1,0 +1,60 @@
+**** scatterplot;
+** y=height, x=weight, stratified by sex
+** F=blue square, M=red triangle;
+symbol1 color=blue value=square height=2;
+symbol2 color=red  value=triangle height=2;
+
+proc gplot data=sashelp.class;
+   	title ‘Scatter Plot of Height and Weight’;
+	plot height* weight = sex;
+   	run;
+	quit;
+
+** no sex stratification;
+proc gplot data=sashelp.class;
+   	title ‘Scatter Plot of Height and Weight’;
+	plot height* weight;
+   	run;
+	quit;
+
+
+**** plot with interpolation - regression plot;
+** interpol=rlclm95: linear regression with bands
+drawn at the 95% confidence limits (CI's) of the mean predicted values;
+** regeqn: display derived equation;
+** ci: interpolation line;
+** cv: data points;
+** co: CI's;
+title1
+  'Linear Regression of Height and Weight';
+title2 ’(with 95% Confidence Limits)’;
+symbol ci=red cv=blue co=gray value=dot
+       interpol=rlclm95 ;
+       
+proc gplot data=sashelp.class;
+	plot height*weight / regeqn;
+	run; 
+	quit;
+
+
+**** line plot;
+title "Simple Line Plot With PROC SGPLOT";
+proc sgplot data=sashelp.stocks;
+   where stock in ('IBM', 'Microsoft');
+   series x=date y=close / group=stock;
+run;
+title;
+
+*** change appearance of line plot;
+** curvelabel: label lines;
+title "Line Plot With Modifications In PROC SGPLOT";
+proc sgplot data=sashelp.stocks noborder;
+   where stock in ('IBM', 'Microsoft');
+   styleattrs datacontrastcolors=(red green);
+   series x=date y=close / curvelabel curvelabelattrs=(size=10)
+                           group=stock lineattrs=(thickness=2);
+   /* keylegend / location=inside position=NE across=1; */
+   xaxis display=(nolabel noline noticks);
+   yaxis display=(noline);
+run;
+title;
