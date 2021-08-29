@@ -1,0 +1,113 @@
+proc format;
+	picture pctfmt low-high= ' 009.99%)' 
+	(prefix='(');picture sdfmt low-high= ' 009.99)' 
+	(prefix='(');picture meanfmt low-high= '009.99';
+	run;
+
+%macro getCatVars;
+%do I=1 %to %sysfunc(countw("&CATVARLIST"));
+	data _NULL_;
+		call symputx('CATVAR', "%qscan(&CATVARLIST, &I, ' ')");
+		run;
+		
+		ods select none;proc tabulate data=&DSET out=mytblc;
+			class &GRP &CATVAR;
+			table &CATVAR all='Total', &GRP=''*(n='Freq' colpctn='(%)'*f=pctfmt.) / box='Variables';
+			run;
+
+			proc freq data=&DSET;
+				table &CATVAR*&GRP / nocum norow nopercent chisq;
+				ods output chisq = pvaluesc (where=(Statistic="Chi-Square"));
+				run;
+
+			ods select all;
+			data pvaluesc;
+				set pvaluesc;_TABLE_=1;
+				keep _TABLE_ Prob;
+				run;
+
+				data mytblc2_&CATVAR;
+					length var $32;
+					merge mytblc pvaluesc;
+					by _table_;
+					var="&CATVAR";
+					values=&CATVAR;
+					if missing(&CATVAR) then delete;
+					run;
+					%end;
+
+%mend getCatVars;
+%macro getQuantVars;
+%do I=1 %to %sysfunc(countw("&QUANTVARLIST"));
+	data _NULL_;
+		call symputx('QUANTVAR', "%qscan(&QUANTVARLIST, &I, ' ')");
+		run;
+		
+		ods select none;
+		proc tabulate data=&DSET out=mytblq(rename=(&QUANTVAR._mean=mymean &QUANTVAR._std=mysd));
+			class &GRP;
+			var &QUANTVAR;
+			table &QUANTVAR, &GRP=''*(mean='Mean' std='(SD)'*f=sdfmt.) / box='Variables';
+			run;
+			
+			proc glm data=&DSET;
+				class &GRP;
+				model &QUANTVAR = &GRP;
+				ods output OverallAnova = pvaluesq (where=(Source="Model"));
+				run;
+				quit;
+				
+				ods select all;
+				data pvaluesq;
+					set pvaluesq;_TABLE_=1;
+					keep _TABLE_ ProbF;
+					run;
+					
+				data mytblq2_&QUANTVAR;
+					length var $32;
+					merge mytblq pvaluesq;
+					by _table_ ;
+					var="&QUANTVAR";
+					run;
+					%end;
+
+%mend getQuantVars;
+	%macro table1(DSET=,GRP=,CATVARLIST=,QUANTVARLIST=);
+		%getCatVars;
+		data mytblc_all;
+			set mytblc2_:;
+			keep var prob values &GRP N PctN_10;
+			run;
+
+proc report data=mytblc_all(rename=(N=myN)) nofs missing;
+	column var prob values &GRP,(myN PctN_10);
+	define var / 'Variable' group;
+	define prob / 'P' group;
+	define values / '' group width=6;
+	define &GRP / across width=3;
+	define myN / 'N' width=3;
+	define PctN_10 / format=pctfmt. '(%)' width=3;
+	run;
+
+	%getQuantVars;
+	data mytblq_all;
+		set mytblq2_:;
+		run;
+	
+	proc report data=mytblq_all nofs;
+		column var probF &GRP,(mymean mysd);
+		define var / 'Variable' group;
+		define probF / 'P' group;
+		define &GRP / across width=3;
+		define mymean / 'Mean' format=meanfmt. width=3;
+		define mysd / '(SD)' format=sdfmt. width=3;
+		run;
+
+%mend table1;
+
+** provided ex in doc;
+%table1(DSET=sashelp.bweight,
+		GRP=black,
+		CATVARLIST=married boy momsmoke momedlevel,
+		QUANTVARLIST=momage momwtgain);
+
