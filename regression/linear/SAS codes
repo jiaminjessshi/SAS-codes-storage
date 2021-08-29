@@ -1,0 +1,18 @@
+**** linear regression;
+PROC SQL;
+create table cars1 as
+SELECT invoice, horsepower, length, weight
+   FROM 
+   SASHELP.CARS
+   WHERE make in ('Audi','BMW');
+RUN;
+
+*** simple: y=horsepower, x=weight;
+proc reg data = cars1;
+model horsepower = weight ;
+run;
+
+*** multi-variable: y=horsepower, x=weight, length;
+proc reg data = cars1;
+model horsepower = weight length;
+run;
