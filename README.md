@@ -11,8 +11,11 @@ This repo saves SAS coding resources collected. All folders except for statistic
 
 ## Analytic
 * statistical tests
-* regression: linear, logistic, poisson, output to excel
+* regression
 * time series
 * survival analysis
 
 ## Macro
+* simplify regression outputs
+* macro functions
+* %do loop
