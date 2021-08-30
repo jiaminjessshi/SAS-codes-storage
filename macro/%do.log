@@ -1,0 +1,77 @@
+ 
+ 1          OPTIONS NONOTES NOSTIMER NOSOURCE NOSYNTAXCHECK;
+ 72         
+ 73         %MACRO DO_LIST;
+ 74         %DO I = 1 %TO 50;
+ 75         COL&I._LINE1 %END;
+ 76         %MEND DO_LIST;
+ 77         
+ 78         VAR %DO_LIST;
+ 78         VAR %DO_LIST;
+            ___
+            180
+ ERROR 180-322: Statement is not valid or it is used out of proper order.
+ 
+ MPRINT(DO_LIST):   VAR COL1_LINE1 COL2_LINE1 COL3_LINE1 COL4_LINE1 COL5_LINE1 
+ COL6_LINE1 COL7_LINE1 COL8_LINE1 COL9_LINE1 COL10_LINE1 COL11_LINE1 
+ COL12_LINE1 COL13_LINE1 COL14_LINE1 COL15_LINE1 COL16_LINE1 COL17_LINE1 
+ COL18_LINE1 COL19_LINE1 COL20_LINE1 COL21_LINE1 COL22_LINE1 COL23_LINE1 
+ COL24_LINE1 COL25_LINE1 COL26_LINE1 COL27_LINE1 COL28_LINE1 COL29_LINE1 
+ COL30_LINE1 COL31_LINE1 COL32_LINE1 COL33_LINE1 COL34_LINE1 COL35_LINE1 
+ COL36_LINE1 COL37_LINE1 COL38_LINE1 COL39_LINE1 COL40_LINE1 COL41_LINE1 
+ COL42_LINE1 COL43_LINE1 COL44_LINE1 COL45_LINE1 COL46_LINE1 COL47_LINE1 
+ COL48_LINE1 COL49_LINE1 COL50_LINE1
+ 
+ 79         
+ 80         *** label a series of variables: PAYX = "Payment for visit X";
+ 81         %MACRO DO_LABEL(COUNT);
+ 82         %DO I = 1 %TO &COUNT;
+ 83         PAY&I = "Payment for visit &I"
+ 84         %END;
+ 85         %MEND DO_LABEL;
+ 86         
+ 87         LABEL %DO_LABEL(15);
+ 87         LABEL %DO_LABEL(15);
+            _____
+            180
+ ERROR 180-322: Statement is not valid or it is used out of proper order.
+ 
+ MPRINT(DO_LABEL):   LABEL PAY1 = "Payment for visit 1" PAY2 = "Payment for 
+ visit 2" PAY3 = "Payment for visit 3" PAY4 = "Payment for visit 4" PAY5 = 
+ "Payment for visit 5" PAY6 = "Payment for visit 6" PAY7 = "Payment for visit 
+ 7" PAY8 = "Payment for visit 8" PAY9 = "Payment for visit 9" PAY10 = "Payment 
+ for visit 10" PAY11 = "Payment for visit 11" PAY12 = "Payment for visit 12" 
+ PAY13 = "Payment for visit 13" PAY14 = "Payment for visit 14" PAY15 = "Payment 
+ for visit 15"
+ 
+ 88         
+ 89         *** run same procedure for a series of datasets;
+ 90         %MACRO DO_MEAN;
+ 91         %DO I = 1 %TO 10;
+ 92         PROC MEANS DATA=CLASS&I;
+ 93         VAR SCORE;
+ 94         TITLE "Average math score of Class &I";
+ 95         RUN;
+ 96         %END;
+ 97         
+ 98         %MEND DO_MEAN;
+ 99         
+ 100        *** logical branch;
+ 101        *** %IF-%THEN, %DO: don't need average scores for Class 3 and Class
+ 101      ! 7;
+ 102        %MACRO DO_BRANCH;
+ 103        %DO I = 1 %TO 10;
+ 104        %IF &I NE 3 AND &I NE 7 %THEN %DO;
+ 105        PROC MEANS DATA=CLASS&I;
+ 106        VAR SCORE;
+ 107        TITLE "Average math score of Class &I";
+ 108        RUN;
+ 109        %END;
+ 110        %END;
+ 111        
+ 112        %MEND DO_BRANCH;
+ 113        
+ 114        
+ 115        
+ 116        OPTIONS NONOTES NOSTIMER NOSOURCE NOSYNTAXCHECK;
+ 128        
