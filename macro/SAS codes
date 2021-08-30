@@ -1,0 +1,285 @@
+options nodate nonumber nocenter formdlim="-";
+data hsb2;
+  input  id female race ses prog
+         read write math science socst;
+datalines;
+ 70 0 4 1 1 57 52 41 47 57
+121 1 4 2 3 68 59 53 63 61
+ 86 0 4 3 1 44 33 54 58 31
+141 0 4 3 3 63 44 47 53 56
+172 0 4 2 2 47 52 57 53 61
+113 1 4 2 2 44 52 51 63 61
+ 50 0 3 2 1 50 59 42 53 61
+ 11 0 1 2 2 34 46 45 39 36
+ 84 0 4 2 1 63 57 54 51 63
+ 48 1 3 2 2 57 55 52 50 51
+ 75 1 4 2 3 60 46 51 53 61
+ 60 1 4 2 2 57 65 51 63 61
+ 95 0 4 3 2 73 60 71 61 71
+104 0 4 3 2 54 63 57 55 46
+ 38 0 3 1 2 45 57 50 31 56
+115 0 4 1 1 42 49 43 50 56
+ 76 0 4 3 2 47 52 51 50 56
+195 0 4 2 1 57 57 60 56 52
+;
+run;
+
+
+proc means data = hsb2;
+  var write math female socst;
+run;
+
+*** linear regression;
+proc reg data = hsb2;
+  model read = write math female socst;
+run;
+quit;
+
+
+**** macro to simplify;
+* %let: create a macro variable;
+* &: ref macro created;
+%let indvars = write math female socst;
+
+proc means data = hsb2;
+  var &indvars;
+run;
+
+proc reg data = hsb2;
+  model read = &indvars;
+run;
+quit;
+
+* %put: display macro variable value as text in the log window;
+%put my first macro variable indvars is &indvars;
+
+* display system-defined macro variables;
+%put _automatic_;
+
+*macro in, only "" can work;
+title "today's date is &SYSDATE9 and today is &SYSDAY";
+proc means data = hsb2;
+  var &indvarS;
+run;
+
+* display user defined macro;
+%put _user_;
+
+
+*** macro functions;
+* string functions: %upcase, %substr and %scan;
+%put &indvars;
+
+%let newind = %upcase(&indvars);
+%put &newind;
+
+* %scan: takes a string and an integer i as arguments and returns the ith word in the string;
+%let word2 = %scan(&indvars, 2);
+%put &word2;
+
+* %substr: pick out a subcomponent of a string variable; 
+* this function takes 3 arguments where the 1st argument is the string variable 
+(a macro variable), the 2nd is the start position of the substring and the 3rd argument 
+is the length of the substring;
+%let subword = %substr(&indvars, 5, 3);
+%put &subword;
+
+* %eval: evaluation functions evaluate arithmetic and logical expressions;
+* only work with integers;
+%let k = 1;
+%let tot = &k + 1;
+%put &tot;
+
+%let tot = %eval(&k + 1);
+%put &tot;
+
+%let tot = %sysevalf(&k + 1.234);
+%put &tot;
+
+
+*** Symput & symget function to pass information to and from a data step;
+
+*  SYMPUT(argument1, argument2), 
+* where argument1 is the macro variable that we are creating which will store 
+the value that is being passed out of the data step;
+* argument2 is the value in string format;
+proc means data = hsb2 n;
+  var write;
+  where write>=55;
+  output out=w55 n=n;
+run;
+
+proc print data = w55;
+run;
+
+data _null_;
+  set w55;
+  call symput('n55', n);
+run;
+%put &n55 Observations have write >=55;
+
+* symget(argument) where argument can be the name of a macro variable;
+* create a new variable in the hsb2 data set that is constant across the entire data set 
+and the value for this variable is the number of students who have 
+a writing score 55 or higher;
+data hsb2_55;
+  set hsb2;
+  w55 = symget('n55')+0;
+run;
+
+proc print data = hsb2_55;
+  var write w55;
+run;
+
+
+*** Creating macro variables using proc sql;
+* create new macro :w55;
+proc sql;
+  select sum(write>=55) into :w55
+  from hsb2;
+quit;
+
+%put w55 is &w55;
+
+* create group means for each level of the variable ses and 
+store them in 3 macro variables called write1, write2 and write3;
+* :write1 - :write3;
+proc sql;
+  select mean(write) into :write1 - :write3
+  from hsb2
+  group by ses;
+quit;
+
+%put write1 to write3 are &write1, &write2 and &write3;
+
+
+**** Create a list of file names for a data step using a macro program;
+data file1 file2 file3 file4;
+  input a @@;
+  if _n_ <= 3 then output file1;
+  if 3 < _n_<=  6 then output file2;
+  if 6 < _n_ <= 9 then output file3;
+  if 9 < _n_ <=12 then output file4;
+cards;
+1 2 3 4 5 6 7 8 9 10 11 12
+;
+run;
+
+data all;
+  set 
+   file1 
+   file2 
+   file3 
+   file4
+  ;
+run;
+
+* use macro;
+%macro combine;
+  data all_1;
+    set
+    %do i = 1 %to 4;
+      file&i
+    %end; 
+    ;
+  run;
+%mend;
+
+*executing the combine program;
+options mprint;
+%combine
+
+* add num;
+%macro combine(num);
+  data big;
+    set
+    %do i = 1 %to &num;
+      file&i
+    %end; 
+    ;
+  run;
+%mend;
+
+*executing the macro program;
+%combine(3)
+
+
+**** repeat a procedure multiple times;
+data xxx;
+  input v1-v5 ind1 ind2;
+  cards;
+1 0 1 1 0 34 23
+0 0 1 0 1 22 32
+1 1 1 0 0 12 10
+0 1 0 1 1 56 90
+0 1 0 1 1 26 80
+1 1 0 0 0 46 45
+0 0 0 1 1 57 53
+1 1 0 0 0 22 77
+0 1 0 1 1 44 45
+1 1 0 0 0 41 72
+;
+run;
+
+proc logistic data = xxx descending;
+  model v1 = ind1 ind2;
+run;
+
+* macro & do loop;
+%macro mylogit(num);
+   %do i = 1 %to &num;
+      title "dependent variable is v&i";
+      proc logistic data=xxx des;
+        model v&i = ind1 ind2;
+      run;
+  %end;
+%mend;
+
+*executing the macro using 5 dependent variable;
+%mylogit(5);
+
+
+
+**** %do loop;
+*** despite errors, macros still work;
+*** generate a list of variables: COLX_LINE1;
+%MACRO DO_LIST; 
+%DO I = 1 %TO 50;   
+	COL&I._LINE1 %END; 
+%MEND DO_LIST;  
+  
+VAR %DO_LIST; 
+
+*** label a series of variables: PAYX = "Payment for visit X";
+%MACRO DO_LABEL(COUNT); 
+	%DO I = 1 %TO &COUNT;   
+	PAY&I = "Payment for visit &I" 
+	%END; 
+%MEND DO_LABEL;    
+
+LABEL %DO_LABEL(15); 
+
+*** run same procedure for a series of datasets;
+%MACRO DO_MEAN; 
+%DO I = 1 %TO 10;   
+	PROC MEANS DATA=CLASS&I;     
+		VAR SCORE;     
+		TITLE "Average math score of Class &I";   
+	RUN; 
+%END; 
+
+%MEND DO_MEAN;
+
+*** logical branch;
+*** %IF-%THEN, %DO: don't need average scores for Class 3 and Class 7;  
+%MACRO DO_BRANCH; 
+%DO I = 1 %TO 10;   
+	%IF &I NE 3 AND &I NE 7 %THEN %DO;      
+		PROC MEANS DATA=CLASS&I;       
+			VAR SCORE;       
+			TITLE "Average math score of Class &I";     
+		RUN;    
+	%END; 
+%END; 
+
+%MEND DO_BRANCH;
